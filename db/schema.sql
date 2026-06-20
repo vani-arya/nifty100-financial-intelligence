@@ -1,0 +1,1 @@
+-- SQLite schema will be added in Sprint 1 Day 4
