@@ -1,6 +1,9 @@
 import sqlite3
+import time
+import pandas as pd
 from pathlib import Path
 import sys
+from datetime import datetime
 
 sys.path.append(str(Path(__file__).resolve().parents[2]))
 
@@ -8,6 +11,10 @@ from src.etl.loader import load_dataset
 
 
 DB_PATH = Path("data/nifty100.db")
+
+AUDIT_PATH = Path(
+    "src/etl/audit/load_audit.csv"
+)
 
 TABLE_FILES = {
     "companies": "companies.xlsx",
@@ -48,11 +55,16 @@ def load_tables(conn):
     companies_df = load_dataset("companies.xlsx")
     valid_ids = set(companies_df["id"])
 
+    audit_rows = []
+
     for table_name, file_name in TABLE_FILES.items():
+        start_time = time.time()
 
         df = load_dataset(file_name)
 
-        # Remove rows with invalid company_id values
+        rows_in = len(df)
+        rejected = 0
+
         if table_name != "companies" and "company_id" in df.columns:
 
             original_rows = len(df)
@@ -61,13 +73,15 @@ def load_tables(conn):
                 df["company_id"].isin(valid_ids)
             ]
 
-            removed_rows = original_rows - len(df)
+            rejected = original_rows - len(df)
 
-            if removed_rows > 0:
+            if rejected > 0:
                 print(
                     f"{table_name:<20} : "
-                    f"{removed_rows} invalid FK rows removed"
+                    f"{rejected} invalid FK rows removed"
                 )
+
+        rows_out = len(df)
 
         df.to_sql(
             table_name,
@@ -78,8 +92,38 @@ def load_tables(conn):
 
         print(
             f"{table_name:<20} : "
-            f"{len(df)} rows loaded"
+            f"{rows_out} rows loaded"
         )
+
+        runtime_s = round(
+         time.time() - start_time,
+    4
+)
+
+        audit_rows.append({
+    "table": table_name,
+    "rows_in": rows_in,
+    "rows_out": rows_out,
+    "rejected": rejected,
+    "timestamp": datetime.now().strftime(
+        "%Y-%m-%d %H:%M:%S"
+    ),
+    "runtime_s": runtime_s
+})
+
+    audit_df = pd.DataFrame(audit_rows)
+
+    AUDIT_PATH.parent.mkdir(
+        parents=True,
+        exist_ok=True
+    )
+
+    audit_df.to_csv(
+        AUDIT_PATH,
+        index=False
+    )
+
+    print("\nload_audit.csv generated")
 
     conn.commit()
 
@@ -88,6 +132,9 @@ def main():
     """Build nifty100.db and load all tables."""
 
     DB_PATH.parent.mkdir(exist_ok=True)
+
+    if DB_PATH.exists():
+        DB_PATH.unlink()
 
     conn = create_database()
 
