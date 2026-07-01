@@ -19,6 +19,19 @@ from src.analytics.ratios import (
     calculate_asset_turnover
 )
 
+from src.analytics.cagr import (
+    calculate_cagr,
+    calculate_revenue_cagr,
+    calculate_pat_cagr,
+    calculate_eps_cagr,
+    
+    TURNAROUND,
+    DECLINE_TO_LOSS,
+    BOTH_NEGATIVE,
+    ZERO_BASE,
+    INSUFFICIENT
+)
+
 
 def test_npm_normal():
 
@@ -161,3 +174,126 @@ def test_asset_turnover_zero_assets():
         sales=1000,
         total_assets=0
     ) is None
+
+
+def test_cagr_normal():
+
+    result, flag = calculate_cagr(
+        100,
+        161.05,
+        5
+    )
+
+    assert round(result, 0) == 10
+    assert flag is None
+
+
+def test_cagr_turnaround():
+
+    result, flag = calculate_cagr(
+        -100,
+        200,
+        5
+    )
+
+    assert result is None
+    assert flag == TURNAROUND
+
+
+def test_cagr_decline_to_loss():
+
+    result, flag = calculate_cagr(
+        100,
+        -50,
+        5
+    )
+
+    assert result is None
+    assert flag == DECLINE_TO_LOSS
+
+
+def test_cagr_both_negative():
+
+    result, flag = calculate_cagr(
+        -100,
+        -50,
+        5
+    )
+
+    assert result is None
+    assert flag == BOTH_NEGATIVE
+
+
+def test_cagr_zero_base():
+
+    result, flag = calculate_cagr(
+        0,
+        100,
+        5
+    )
+
+    assert result is None
+    assert flag == ZERO_BASE
+
+
+from src.analytics.cagr import calculate_period_cagr
+
+
+def test_cagr_insufficient():
+
+    result, flag = calculate_period_cagr(
+        [100, 120],
+        5
+    )
+
+    assert result is None
+    assert flag == INSUFFICIENT
+
+
+def test_revenue_cagr_3yr():
+
+    result, flag = calculate_revenue_cagr(
+        [100, 120, 140, 160],
+        3
+    )
+
+    assert result is not None
+    assert flag is None
+
+
+def test_revenue_cagr_5yr():
+
+    result, flag = calculate_revenue_cagr(
+        [100, 110, 120, 130, 145, 160],
+        5
+    )
+
+    assert result is not None
+    assert flag is None
+
+
+def test_pat_cagr_5yr():
+
+    result, flag = calculate_pat_cagr(
+        [50, 60, 70, 80, 90, 100],
+        5
+    )
+
+    assert result is not None
+    assert flag is None
+
+
+def test_eps_cagr_10yr():
+
+    values = [
+        10, 11, 12, 13, 14,
+        15, 16, 17, 18, 19, 20
+    ]
+
+    result, flag = calculate_eps_cagr(
+        values,
+        10
+    )
+
+    assert result is not None
+    assert flag is None
