@@ -32,3 +32,6 @@ output/*.xlsx
 
 # Windows
 Thumbs.db
+
+# Debug utilities
+src/debug/
