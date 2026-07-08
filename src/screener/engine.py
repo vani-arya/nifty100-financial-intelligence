@@ -117,38 +117,80 @@ def load_data():
         how="left"
     )
 
-    print("\nPE populated:", df["pe_ratio"].notna().sum())
-    print("PB populated:", df["pb_ratio"].notna().sum())
-    print("Dividend populated:", df["dividend_yield_pct"].notna().sum())
 
-    print(
-    df[
-        [
-            "company_id",
-            "year",
-            "pe_ratio",
-            "pb_ratio",
-            "dividend_yield_pct"
-        ]
-    ].dropna().head(10)
-)
-
-
-    duplicates = (
-         df.groupby(
-        ["company_id", "year"]
-    )
-    .size()
-    .reset_index(name="count")
-)
-
-    print(
-    duplicates[
-        duplicates["count"] > 1
-    ].head(20)
+    df = df.drop_duplicates(
+    subset=["company_id", "year"]
 )
 
     return df
+
+
+def get_turnaround_companies(df):
+
+    temp = df.copy()
+
+    temp["numeric_year"] = (
+        temp["year"]
+        .astype(str)
+        .str.extract(r"(\d{4})")[0]
+        .astype(float)
+    )
+
+    temp = temp.sort_values(
+        ["company_id", "numeric_year"]
+    )
+
+    turnaround = []
+
+    for company in temp["company_id"].unique():
+
+        company_df = temp[
+            temp["company_id"] == company
+        ].sort_values("numeric_year")
+
+        if len(company_df) < 4:
+            continue
+
+        latest = company_df.iloc[-1]
+        prev = company_df.iloc[-2]
+
+        latest_sales = latest["sales"]
+
+        sales_3yr_ago = company_df.iloc[-4]["sales"]
+
+        if (
+            pd.isna(latest_sales)
+            or pd.isna(sales_3yr_ago)
+            or sales_3yr_ago <= 0
+        ):
+            continue
+
+        revenue_cagr_3yr = (
+            (
+                latest_sales
+                / sales_3yr_ago
+            ) ** (1 / 3)
+            - 1
+        ) * 100
+
+        de_declining = (
+            latest["debt_to_equity"]
+            < prev["debt_to_equity"]
+        )
+
+        positive_fcf = (
+            latest["free_cash_flow_cr"]
+            > 0
+        )
+
+        if (
+            revenue_cagr_3yr > 10
+            and de_declining
+            and positive_fcf
+        ):
+            turnaround.append(company)
+
+    return turnaround
 
 
 def apply_filters(
@@ -282,6 +324,39 @@ def apply_filters(
             >= filters["min_sales"]
         ]
 
+    # Dividend payout filter
+
+    if filters.get("max_dividend_payout") is not None:
+
+      df = df[
+        df["dividend_payout_ratio_pct"]
+        <= filters["max_dividend_payout"]
+    ]
+
+
+    # Exact debt/equity filter
+
+    if filters.get("exact_de") is not None:
+
+        df = df[
+            df["debt_to_equity"]
+            == filters["exact_de"]
+        ]
+
+
+    # Turnaround Watch filter
+
+    if filters.get("declining_de"):
+
+        turnaround_companies = get_turnaround_companies(df)
+
+        df = df[
+            df["company_id"].isin(
+                turnaround_companies
+            )
+        ]
+
+
     df = df.sort_values(
         "composite_quality_score",
         ascending=False
@@ -291,37 +366,56 @@ def apply_filters(
 
 
 
-def run_screener():
+def run_screener(
+    preset_name
+):
 
     config = load_config()
 
     df = load_data()
 
+    df["numeric_year"] = (
+    df["year"]
+    .astype(str)
+    .str.extract(r"(\d{4})")[0]
+    .astype(float)
+)
+
+    latest = (
+    df.groupby("company_id")
+    ["numeric_year"]
+    .transform("max")
+)
+
+    df = df[
+    df["numeric_year"] == latest
+]
+
+    
+    filters = config[
+        "presets"
+    ][
+        preset_name
+    ]
+
     result = apply_filters(
         df,
-        config["filters"]
+        filters
     )
 
     return result
 
 if __name__ == "__main__":
 
-    result = run_screener()
-
-    print("\nRows:", len(result))
-    
-    print("\nColumns:")
-    print(result.columns.tolist())
+    result = run_screener(
+        "quality_compounder"
+    )
 
     print(
-    "\nDividend Yield Nulls:",
-    result["dividend_yield_pct"].isna().sum()
-)
-
-   
-    print(result.head())
+        result.head()
+    )
 
     print(
         "\nRows:",
-        len(result)
+        result["company_id"].nunique()
     )
