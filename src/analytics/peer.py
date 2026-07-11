@@ -72,11 +72,6 @@ def merge_peer_groups():
         financial_df
     )
 
-    peer_df = peer_df[
-        peer_df["company_id"]
-        != "SBIN"
-    ]
-
     merged = financial_df.merge(
         peer_df,
         on="company_id",
