@@ -1,93 +1,102 @@
 import streamlit as st
+import plotly.express as px
+
 from src.dashboard.utils.db import (
-    get_companies,
-    get_sectors
+    get_home_metrics,
+    get_sector_breakdown,
+    get_top_companies,
+    get_companies
 )
 
 st.title("🏠 Nifty 100 Analytics")
 
-st.markdown(
-    """
-    Welcome to the Nifty 100 Financial Intelligence Platform.
-
-    This dashboard provides:
-    - Company financial analysis
-    - KPI benchmarking
-    - Stock screening
-    - Peer comparison
-    - Trend analytics
-    - Capital allocation insights
-    - Valuation analytics
-    """
+selected_year = st.sidebar.selectbox(
+    "Select Year",
+    [2019, 2020, 2021, 2022, 2023, 2024],
+    index=5
 )
 
-# -----------------------------
-# Load Data
-# -----------------------------
+metrics = get_home_metrics(selected_year)
 
 companies = get_companies()
-sectors = get_sectors()
 
-# -----------------------------
-# KPI Cards
-# -----------------------------
+sector_df = get_sector_breakdown()
 
-col1, col2 = st.columns(2)
+top_df = get_top_companies()
 
-with col1:
-    st.metric(
-        "Total Companies",
-        len(companies)
-    )
+st.subheader("Market Overview")
 
-with col2:
-    st.metric(
-        "Total Sectors",
-        sectors["broad_sector"].nunique()
-    )
+c1, c2, c3 = st.columns(3)
 
-# -----------------------------
-# Dataset Overview
-# -----------------------------
-
-st.subheader("Dataset Overview")
-
-st.write(
-    f"""
-    Database currently contains
-    **{len(companies)} companies**
-    available for analysis.
-    """
+c1.metric(
+    "Average ROE %",
+    metrics["avg_roe"]
 )
 
-# -----------------------------
-# Company Preview
-# -----------------------------
-
-st.subheader("Company Preview")
-
-preview_cols = [
-    col
-    for col in [
-        "id",
-        "company_name",
-        "roe_percentage",
-        "roce_percentage"
-    ]
-    if col in companies.columns
-]
-
-st.dataframe(
-    companies[preview_cols].head(10),
-    use_container_width=True
+c2.metric(
+    "Median D/E",
+    metrics["median_de"]
 )
 
-# -----------------------------
-# Footer
-# -----------------------------
+c3.metric(
+    "Median Revenue CAGR %",
+    metrics["median_rev_cagr"]
+)
+
+c4, c5, c6 = st.columns(3)
+
+c4.metric(
+    "Total Companies",
+    len(companies)
+)
+
+c5.metric(
+    "Debt Free Companies",
+    metrics["debt_free"]
+)
+
+c6.metric(
+    "Median P/E",
+    "N/A"
+)
 
 st.divider()
 
-st.caption(
-    "Sprint 4 • Day 22 Dashboard Scaffold"
+st.subheader("Sector Distribution")
+
+fig = px.pie(
+    sector_df,
+    names="broad_sector",
+    values="company_count",
+    hole=0.5
+)
+
+st.plotly_chart(
+    fig,
+    use_container_width=True
+)
+
+st.divider()
+
+st.subheader(
+    "Top 5 Companies by Composite Quality Score"
+)
+
+display_df = top_df[
+    [
+        "company_id",
+        "company_name",
+        "composite_quality_score"
+    ]
+]
+
+display_df.columns = [
+    "Ticker",
+    "Company",
+    "Composite Score"
+]
+
+st.dataframe(
+    display_df,
+    use_container_width=True
 )

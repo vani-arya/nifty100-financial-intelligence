@@ -1,165 +1,280 @@
 import streamlit as st
+import pandas as pd
+import plotly.graph_objects as go
+
 from src.dashboard.utils.db import (
     get_companies,
-    get_ratios,
-    get_pl,
-    get_bs,
-    get_cf
+    get_company_profile,
+    get_company_latest_ratios,
+    get_company_timeseries,
+    get_pros_cons
 )
 
 st.title("📊 Company Profile")
 
-# ---------------------------------
-# Company Selector
-# ---------------------------------
-
 companies = get_companies()
 
-company_map = dict(
-    zip(
-        companies["company_name"],
-        companies["id"]
-    )
+search_text = st.text_input(
+    "Search Company Name or Ticker"
 )
+
+filtered = companies.copy()
+
+if search_text:
+
+    filtered = companies[
+        companies["company_name"]
+        .str.contains(search_text, case=False, na=False)
+        |
+        companies["id"]
+        .str.contains(search_text, case=False, na=False)
+    ]
+
+if filtered.empty:
+
+    st.warning(
+        "Ticker not found — please try another."
+    )
+
+    st.stop()
 
 selected_company = st.selectbox(
     "Select Company",
-    sorted(company_map.keys())
+    filtered["company_name"]
 )
 
-ticker = company_map[selected_company]
-
-# ---------------------------------
-# Load Data
-# ---------------------------------
-
-ratios = get_ratios(ticker)
-pl = get_pl(ticker)
-bs = get_bs(ticker)
-cf = get_cf(ticker)
-
-# ---------------------------------
-# Company Information
-# ---------------------------------
-
-company_info = companies[
-    companies["id"] == ticker
+company_row = filtered[
+    filtered["company_name"]
+    == selected_company
 ].iloc[0]
 
-st.subheader(selected_company)
+ticker = company_row["id"]
 
-col1, col2, col3 = st.columns(3)
+company_df, sector_df = get_company_profile(ticker)
+
+ratios = get_company_latest_ratios(ticker)
+
+pl_df, ratio_history = get_company_timeseries(ticker)
+
+pros_cons = get_pros_cons(ticker)
+
+# --------------------------------------------------
+# COMPANY CARD
+# --------------------------------------------------
+
+st.header(company_row["company_name"])
+
+col1, col2 = st.columns(2)
 
 with col1:
 
-    st.metric(
-        "ROE %",
-        company_info["roe_percentage"]
+    if not sector_df.empty:
+
+        st.markdown(
+            f"**Sector:** {sector_df.iloc[0]['broad_sector']}"
+        )
+
+        st.markdown(
+            f"**Sub Sector:** {sector_df.iloc[0]['sub_sector']}"
+        )
+
+    st.markdown(
+        f"**Ticker:** {ticker}"
     )
 
 with col2:
 
-    st.metric(
-        "ROCE %",
-        company_info["roce_percentage"]
-    )
+    if (
+        not company_df.empty
+        and
+        "about_company" in company_df.columns
+    ):
 
-with col3:
+        st.markdown(
+            company_df.iloc[0]["about_company"]
+        )
 
-    st.metric(
-        "Book Value",
-        company_info["book_value"]
-    )
-
-# ---------------------------------
-# Latest KPI Snapshot
-# ---------------------------------
-
-st.subheader("Latest Financial Ratios")
+# --------------------------------------------------
+# KPI TILES
+# --------------------------------------------------
 
 if not ratios.empty:
 
-    latest = ratios.iloc[-1]
+    latest = ratios.iloc[0]
 
-    kpi1, kpi2, kpi3, kpi4 = st.columns(4)
+    c1, c2, c3 = st.columns(3)
 
-    with kpi1:
-        st.metric(
-            "ROE",
-            round(
-                latest["return_on_equity_pct"],
-                2
-            )
+    c4, c5, c6 = st.columns(3)
+
+    c1.metric(
+        "ROE %",
+        round(
+            latest["return_on_equity_pct"],
+            2
         )
+    )
 
-    with kpi2:
-        st.metric(
-            "ROCE",
-            round(
-                latest["return_on_capital_employed_pct"],
-                2
-            )
+    c2.metric(
+        "ROCE %",
+        round(
+            latest[
+                "return_on_capital_employed_pct"
+            ],
+            2
         )
+    )
 
-    with kpi3:
-        st.metric(
-            "Debt / Equity",
-            round(
-                latest["debt_to_equity"],
-                2
-            )
+    c3.metric(
+        "Net Profit Margin %",
+        round(
+            latest[
+                "net_profit_margin_pct"
+            ],
+            2
         )
+    )
 
-    with kpi4:
-        st.metric(
-            "NPM %",
-            round(
-                latest["net_profit_margin_pct"],
-                2
-            )
+    c4.metric(
+        "Debt / Equity",
+        round(
+            latest["debt_to_equity"],
+            2
         )
+    )
 
-# ---------------------------------
-# Tabs
-# ---------------------------------
+    c5.metric(
+        "Revenue CAGR 5Y %",
+        round(
+            latest["revenue_cagr_5yr"],
+            2
+        )
+    )
 
-tab1, tab2, tab3, tab4 = st.tabs(
-    [
-        "Profit & Loss",
-        "Balance Sheet",
-        "Cash Flow",
-        "Financial Ratios"
-    ]
+    c6.metric(
+        "Free Cash Flow",
+        round(
+            latest["free_cash_flow_cr"],
+            2
+        )
+    )
+
+# --------------------------------------------------
+# REVENUE VS PROFIT
+# --------------------------------------------------
+
+st.subheader(
+    "Revenue vs Net Profit (10 Years)"
 )
 
-with tab1:
+if not pl_df.empty:
 
-    st.dataframe(
-        pl,
+    fig = go.Figure()
+
+    fig.add_bar(
+        x=pl_df["year"],
+        y=pl_df["sales"],
+        name="Revenue"
+    )
+
+    fig.add_bar(
+        x=pl_df["year"],
+        y=pl_df["net_profit"],
+        name="Net Profit"
+    )
+
+    st.plotly_chart(
+        fig,
         use_container_width=True
     )
 
-with tab2:
+# --------------------------------------------------
+# ROE VS ROCE
+# --------------------------------------------------
 
-    st.dataframe(
-        bs,
-        use_container_width=True
-    )
-
-with tab3:
-
-    st.dataframe(
-        cf,
-        use_container_width=True
-    )
-
-with tab4:
-
-    st.dataframe(
-        ratios,
-        use_container_width=True
-    )
-
-st.caption(
-    "Sprint 4 - Day 22 Scaffold"
+st.subheader(
+    "ROE vs ROCE Trend"
 )
+
+if not ratio_history.empty:
+
+    fig2 = go.Figure()
+
+    fig2.add_scatter(
+        x=ratio_history["year"],
+        y=ratio_history[
+            "return_on_equity_pct"
+        ],
+        mode="lines+markers",
+        name="ROE"
+    )
+
+    fig2.add_scatter(
+        x=ratio_history["year"],
+        y=ratio_history[
+            "return_on_capital_employed_pct"
+        ],
+        mode="lines+markers",
+        name="ROCE"
+    )
+
+    st.plotly_chart(
+        fig2,
+        use_container_width=True
+    )
+
+# --------------------------------------------------
+# PROS & CONS
+# --------------------------------------------------
+st.subheader("Pros & Cons")
+
+if pros_cons.empty:
+
+    st.warning(
+        "Pros & Cons not available for this company."
+    )
+
+else:
+
+    pros_text = str(
+        pros_cons.iloc[0]["pros"]
+    )
+
+    cons_text = str(
+        pros_cons.iloc[0]["cons"]
+    )
+
+    col1, col2 = st.columns(2)
+
+    with col1:
+
+        st.success("Pros")
+
+        if (
+            pros_text == "None"
+            or pros_text.strip() == ""
+            or pros_text.lower() == "nan"
+        ):
+            st.info(
+                "No pros available."
+            )
+        else:
+            st.markdown(
+                f"✅ {pros_text}"
+            )
+
+    with col2:
+
+        st.error("Cons")
+
+        if (
+            cons_text == "None"
+            or cons_text.strip() == ""
+            or cons_text.lower() == "nan"
+        ):
+            st.info(
+                "No cons available."
+            )
+        else:
+            st.markdown(
+                f"❌ {cons_text}"
+            )
