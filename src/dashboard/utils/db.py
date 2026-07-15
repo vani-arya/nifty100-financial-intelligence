@@ -658,3 +658,198 @@ def get_peer_group_data():
         on="company_id",
         how="left"
     )
+
+
+@st.cache_data(ttl=600)
+def get_trend_data(ticker):
+
+    pl = get_pl(ticker)
+
+    ratios = get_ratios(ticker)
+
+    if not pl.empty:
+
+        pl["numeric_year"] = (
+            pl["year"]
+            .astype(str)
+            .str.extract(r"(\d{4})")[0]
+            .astype(float)
+        )
+
+    if not ratios.empty:
+
+        ratios["numeric_year"] = (
+            ratios["year"]
+            .astype(str)
+            .str.extract(r"(\d{4})")[0]
+            .astype(float)
+        )
+
+    return pl, ratios
+
+
+@st.cache_data(ttl=600)
+def get_sector_analysis_data():
+
+    conn = get_connection()
+
+    ratios = pd.read_sql(
+    """
+    SELECT
+        company_id,
+        year,
+        return_on_equity_pct,
+        revenue_cagr_5yr,
+        pat_cagr_5yr,
+        free_cash_flow_cr,
+        debt_to_equity
+    FROM financial_ratios
+    """,
+    conn
+)
+
+    pl = pd.read_sql(
+        """
+        SELECT company_id,
+               year,
+               sales
+        FROM profitandloss
+        """,
+        conn
+    )
+
+    market = pd.read_sql(
+        """
+        SELECT company_id,
+               year,
+               market_cap_crore
+        FROM market_cap
+        """,
+        conn
+    )
+
+    sectors = pd.read_sql(
+        """
+        SELECT company_id,
+               broad_sector,
+               sub_sector
+        FROM sectors
+        """,
+        conn
+    )
+
+    companies = pd.read_sql(
+        """
+        SELECT id,
+               company_name
+        FROM companies
+        """,
+        conn
+    )
+
+    conn.close()
+
+    ratios["numeric_year"] = (
+        ratios["year"]
+        .astype(str)
+        .str.extract(r"(\d{4})")[0]
+        .astype(float)
+    )
+
+    latest = (
+        ratios.groupby("company_id")
+        ["numeric_year"]
+        .transform("max")
+    )
+
+    ratios = ratios[
+        ratios["numeric_year"] == latest
+    ]
+
+    ratios = (
+        ratios
+        .sort_values("numeric_year")
+        .drop_duplicates(
+            "company_id",
+            keep="last"
+        )
+    )
+
+    pl["numeric_year"] = (
+        pl["year"]
+        .astype(str)
+        .str.extract(r"(\d{4})")[0]
+        .astype(float)
+    )
+
+    latest = (
+        pl.groupby("company_id")
+        ["numeric_year"]
+        .transform("max")
+    )
+
+    pl = pl[
+        pl["numeric_year"] == latest
+    ]
+
+    market = (
+        market
+        .sort_values("year")
+        .drop_duplicates(
+            "company_id",
+            keep="last"
+        )
+    )
+
+    df = ratios.merge(
+        pl[["company_id", "sales"]],
+        on="company_id",
+        how="left"
+    )
+
+    df = df.merge(
+        market[
+            [
+                "company_id",
+                "market_cap_crore"
+            ]
+        ],
+        on="company_id",
+        how="left"
+    )
+
+    df = df.merge(
+        sectors,
+        on="company_id",
+        how="left"
+    )
+
+    df = df.merge(
+        companies,
+        left_on="company_id",
+        right_on="id",
+        how="left"
+    )
+
+    return df
+
+
+@st.cache_data(ttl=600)
+def get_reports(ticker):
+
+    conn = get_connection()
+
+    df = pd.read_sql(
+        """
+        SELECT *
+        FROM documents
+        WHERE company_id = ?
+        ORDER BY Year DESC
+        """,
+        conn,
+        params=[ticker]
+    )
+
+    conn.close()
+
+    return df

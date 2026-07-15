@@ -1,46 +1,57 @@
 import streamlit as st
 
-st.title("📑 Reports & Documents")
-
-st.markdown("""
-Access annual reports, company documents, and generated analytics exports.
-""")
-
-col1, col2, col3 = st.columns(3)
-
-with col1:
-    st.metric(
-        "Documents",
-        1457
-    )
-
-with col2:
-    st.metric(
-        "Companies",
-        92
-    )
-
-with col3:
-    st.metric(
-        "Report Types",
-        3
-    )
-
-report_type = st.selectbox(
-    "Select Report Type",
-    [
-        "Annual Reports",
-        "Investor Presentations",
-        "Corporate Filings"
-    ]
+from src.dashboard.utils.db import (
+    get_companies,
+    get_reports
 )
 
-st.success(
-    f"Selected: {report_type}"
+st.title("📄 Annual Reports")
+
+companies = get_companies()
+
+selected_company = st.selectbox(
+    "Select Company",
+    companies["id"].tolist(),
+    format_func=lambda x:
+        companies.loc[
+            companies["id"] == x,
+            "company_name"
+        ].iloc[0]
 )
 
-st.info(
-    "Document viewer functionality will be added in later Sprint 4 tasks."
+reports = get_reports(
+    selected_company
 )
 
-st.caption("Sprint 4 - Day 22 Scaffold")
+if reports.empty:
+
+    st.warning(
+        "No annual reports available."
+    )
+
+else:
+
+    st.success(
+        f"{len(reports)} reports found"
+    )
+
+    for _, row in reports.iterrows():
+
+        year = row["Year"]
+        url = row["Annual_Report"]
+
+        if (
+            url is None
+            or str(url).strip() == ""
+        ):
+
+            st.error(
+                f"{year} - Report unavailable"
+            )
+
+        else:
+
+            st.markdown(
+                f"📘 **{year}** - "
+                f"[Open Annual Report]({url})"
+            )
