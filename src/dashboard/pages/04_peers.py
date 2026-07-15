@@ -1,45 +1,164 @@
 import streamlit as st
+import pandas as pd
+import plotly.graph_objects as go
+
+from src.dashboard.utils.db import (
+    get_peer_group_data
+)
 
 st.title("👥 Peer Comparison")
 
-st.markdown("""
-Compare companies against peer groups using percentile rankings.
-""")
+peer_df = get_peer_group_data()
 
-col1, col2, col3 = st.columns(3)
+# ==========================
+# Peer Group Selection
+# ==========================
 
-with col1:
-    st.metric("Peer Groups", 11)
-
-with col2:
-    st.metric("Mapped Companies", 56)
-
-with col3:
-    st.metric("Percentile Records", 550)
-
-peer_group = st.selectbox(
-    "Select Peer Group",
-    [
-        "Automobiles",
-        "Consumer Finance",
-        "FMCG",
-        "IT Services",
-        "Life Insurance",
-        "Oil & Gas",
-        "Pharmaceuticals",
-        "Power & Utilities",
-        "Private Banks",
-        "Public Sector Banks",
-        "Steel"
+peer_groups = sorted(
+    peer_df[
+        "peer_group_name"
     ]
+    .dropna()
+    .unique()
 )
 
-st.success(
-    f"Selected Group: {peer_group}"
+selected_group = st.selectbox(
+    "Select Peer Group",
+    peer_groups
 )
 
-st.info(
-    "Radar charts and percentile benchmarking will be added in upcoming Sprint 4 tasks."
+group_df = peer_df[
+    peer_df["peer_group_name"]
+    == selected_group
+]
+
+# ==========================
+# Company Selection
+# ==========================
+
+selected_company = st.selectbox(
+    "Select Company",
+    sorted(
+        group_df[
+            "company_id"
+        ].unique()
+    )
 )
 
-st.caption("Sprint 4 - Day 22 Scaffold")
+# ==========================
+# Radar Chart
+# ==========================
+
+metrics = [
+    "return_on_equity_pct",
+    "return_on_capital_employed_pct",
+    "net_profit_margin_pct",
+    "debt_to_equity",
+    "free_cash_flow_cr",
+    "revenue_cagr_5yr",
+    "pat_cagr_5yr",
+    "interest_coverage"
+]
+
+company_row = group_df[
+    group_df["company_id"]
+    == selected_company
+]
+
+peer_avg = (
+    group_df[metrics]
+    .mean()
+)
+
+company_values = (
+    company_row[metrics]
+    .iloc[0]
+)
+
+fig = go.Figure()
+
+fig.add_trace(
+    go.Scatterpolar(
+        r=company_values.tolist(),
+        theta=metrics,
+        fill="toself",
+        name=selected_company
+    )
+)
+
+fig.add_trace(
+    go.Scatterpolar(
+        r=peer_avg.tolist(),
+        theta=metrics,
+        fill="toself",
+        name="Peer Average"
+    )
+)
+
+fig.update_layout(
+    polar=dict(
+        radialaxis=dict(
+            visible=True
+        )
+    ),
+    showlegend=True
+)
+
+st.subheader(
+    "Company vs Peer Average"
+)
+
+st.plotly_chart(
+    fig,
+    width="stretch"
+)
+
+# ==========================
+# KPI Table
+# ==========================
+
+table_cols = [
+    "company_id",
+    "return_on_equity_pct",
+    "return_on_capital_employed_pct",
+    "net_profit_margin_pct",
+    "debt_to_equity",
+    "free_cash_flow_cr",
+    "revenue_cagr_5yr",
+    "pat_cagr_5yr",
+    "composite_quality_score",
+    "is_benchmark"
+]
+
+display_df = (
+    group_df[
+        table_cols
+    ]
+    .copy()
+)
+
+st.subheader(
+    "Peer Group KPI Table"
+)
+
+def highlight_benchmark(row):
+
+    if row["is_benchmark"] == 1:
+
+        return [
+            "background-color: lightgreen"
+        ] * len(row)
+
+    return [
+        ""
+    ] * len(row)
+
+st.dataframe(
+    display_df
+    .style
+    .apply(
+        highlight_benchmark,
+        axis=1
+    ),
+    width="stretch"
+)

@@ -401,3 +401,260 @@ def get_pros_cons(ticker):
     conn.close()
 
     return df
+
+
+@st.cache_data(ttl=600)
+def get_screener_data():
+
+    conn = get_connection()
+
+    ratios = pd.read_sql(
+        """
+        SELECT *
+        FROM financial_ratios
+        """,
+        conn
+    )
+
+    market = pd.read_sql(
+        """
+        SELECT *
+        FROM market_cap
+        """,
+        conn
+    )
+
+    pnl = pd.read_sql(
+        """
+        SELECT *
+        FROM profitandloss
+        """,
+        conn
+    )
+
+    companies = pd.read_sql(
+        """
+        SELECT id,
+               company_name
+        FROM companies
+        """,
+        conn
+    )
+
+    sectors = pd.read_sql(
+        """
+        SELECT company_id,
+               broad_sector
+        FROM sectors
+        """,
+        conn
+    )
+
+    conn.close()
+
+    # --------------------------
+    # Latest ratios per company
+    # --------------------------
+
+    ratios["numeric_year"] = (
+        ratios["year"]
+        .astype(str)
+        .str.extract(r"(\d{4})")[0]
+        .astype(float)
+    )
+
+    latest = (
+        ratios.groupby("company_id")
+        ["numeric_year"]
+        .transform("max")
+    )
+
+    ratios = ratios[
+        ratios["numeric_year"] == latest
+    ]
+
+    ratios = (
+        ratios
+        .sort_values("numeric_year")
+        .drop_duplicates(
+            "company_id",
+            keep="last"
+        )
+    )
+
+    # --------------------------
+    # Latest market cap
+    # --------------------------
+
+    market = (
+        market
+        .sort_values("year")
+        .drop_duplicates(
+            "company_id",
+            keep="last"
+        )
+    )
+
+    # --------------------------
+    # Latest pnl
+    # --------------------------
+
+    pnl["numeric_year"] = (
+        pnl["year"]
+        .astype(str)
+        .str.extract(r"(\d{4})")[0]
+        .astype(float)
+    )
+
+    latest_pnl = (
+        pnl.groupby("company_id")
+        ["numeric_year"]
+        .transform("max")
+    )
+
+    pnl = pnl[
+        pnl["numeric_year"] == latest_pnl
+    ]
+
+    pnl = (
+        pnl
+        .sort_values("numeric_year")
+        .drop_duplicates(
+            "company_id",
+            keep="last"
+        )
+    )
+
+    df = (
+        ratios
+        .merge(
+            companies,
+            left_on="company_id",
+            right_on="id",
+            how="left"
+        )
+        .merge(
+            sectors,
+            on="company_id",
+            how="left"
+        )
+        .merge(
+            market[
+                [
+                    "company_id",
+                    "pe_ratio",
+                    "pb_ratio",
+                    "dividend_yield_pct"
+                ]
+            ],
+            on="company_id",
+            how="left"
+        )
+        .merge(
+            pnl[
+                [
+                    "company_id",
+                    "opm_percentage"
+                ]
+            ],
+            on="company_id",
+            how="left"
+        )
+    )
+
+    return df
+
+
+@st.cache_data(ttl=600)
+def get_peer_groups():
+
+    conn = get_connection()
+
+    df = pd.read_sql(
+        """
+        SELECT DISTINCT peer_group_name
+        FROM peer_groups
+        ORDER BY peer_group_name
+        """,
+        conn
+    )
+
+    conn.close()
+
+    return df
+
+
+@st.cache_data(ttl=600)
+def get_peer_data(group_name):
+
+    conn = get_connection()
+
+    df = pd.read_sql(
+        """
+        SELECT *
+        FROM peer_percentiles
+        WHERE peer_group_name = ?
+        """,
+        conn,
+        params=[group_name]
+    )
+
+    conn.close()
+
+    return df
+
+
+@st.cache_data(ttl=600)
+def get_peer_group_data():
+
+    conn = get_connection()
+
+    peer = pd.read_sql(
+        """
+        SELECT *
+        FROM peer_groups
+        """,
+        conn
+    )
+
+    ratios = pd.read_sql(
+        """
+        SELECT *
+        FROM financial_ratios
+        """,
+        conn
+    )
+
+    conn.close()
+
+    ratios["numeric_year"] = (
+        ratios["year"]
+        .astype(str)
+        .str.extract(r"(\d{4})")[0]
+        .astype(float)
+    )
+
+    latest = (
+        ratios.groupby("company_id")
+        ["numeric_year"]
+        .transform("max")
+    )
+
+    ratios = ratios[
+        ratios["numeric_year"] == latest
+    ]
+
+    ratios = (
+        ratios
+        .sort_values("numeric_year")
+        .drop_duplicates(
+            "company_id",
+            keep="last"
+        )
+    )
+
+    return peer.merge(
+        ratios,
+        on="company_id",
+        how="left"
+    )
