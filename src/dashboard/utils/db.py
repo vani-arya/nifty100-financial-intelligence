@@ -175,7 +175,13 @@ def get_home_metrics(year=None):
         conn
     )
 
-    conn.close()
+    market_cap = pd.read_sql(
+        """
+        SELECT *
+        FROM market_cap
+        """,
+        conn
+    )
 
     if year:
 
@@ -184,6 +190,14 @@ def get_home_metrics(year=None):
             .astype(str)
             .str.contains(str(year))
         ]
+
+        market_cap = market_cap[
+            market_cap["year"]
+            .astype(str)
+            .str.contains(str(year))
+        ]
+
+    conn.close()
 
     # Remove unrealistic ROE outliers
     roe = ratios["return_on_equity_pct"]
@@ -194,6 +208,7 @@ def get_home_metrics(year=None):
     ]
 
     metrics = {
+
         "avg_roe":
             round(
                 roe.mean(),
@@ -216,6 +231,14 @@ def get_home_metrics(year=None):
                 2
             ),
 
+        "median_pe":
+            round(
+                market_cap[
+                    "pe_ratio"
+                ].median(),
+                2
+            ),
+
         "debt_free":
             (
                 ratios[
@@ -225,28 +248,6 @@ def get_home_metrics(year=None):
     }
 
     return metrics
-
-
-@st.cache_data(ttl=600)
-def get_sector_breakdown():
-
-    conn = get_connection()
-
-    df = pd.read_sql(
-        """
-        SELECT broad_sector,
-               COUNT(*) as company_count
-        FROM sectors
-        GROUP BY broad_sector
-        ORDER BY company_count DESC
-        """,
-        conn
-    )
-
-    conn.close()
-
-    return df
-
 
 @st.cache_data(ttl=600)
 def get_top_companies():
@@ -848,6 +849,27 @@ def get_reports(ticker):
         """,
         conn,
         params=[ticker]
+    )
+
+    conn.close()
+
+    return df
+
+
+@st.cache_data(ttl=600)
+def get_sector_breakdown():
+
+    conn = get_connection()
+
+    df = pd.read_sql(
+        """
+        SELECT broad_sector,
+               COUNT(*) as company_count
+        FROM sectors
+        GROUP BY broad_sector
+        ORDER BY company_count DESC
+        """,
+        conn
     )
 
     conn.close()

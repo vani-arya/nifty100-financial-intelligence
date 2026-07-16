@@ -97,6 +97,11 @@ with col2:
 # --------------------------------------------------
 # KPI TILES
 # --------------------------------------------------
+def safe_metric(value):
+    if pd.isna(value):
+        return "N/A"
+    return round(value, 2)
+
 
 if not ratios.empty:
 
@@ -107,54 +112,46 @@ if not ratios.empty:
     c4, c5, c6 = st.columns(3)
 
     c1.metric(
-        "ROE %",
-        round(
-            latest["return_on_equity_pct"],
-            2
-        )
+    "ROE %",
+    safe_metric(
+        latest["return_on_equity_pct"]
     )
+)
 
     c2.metric(
         "ROCE %",
-        round(
+        safe_metric(
             latest[
-                "return_on_capital_employed_pct"
-            ],
-            2
+                "return_on_capital_employed_pct"]
         )
     )
 
     c3.metric(
         "Net Profit Margin %",
-        round(
+        safe_metric(
             latest[
-                "net_profit_margin_pct"
-            ],
-            2
+                "net_profit_margin_pct"]
         )
     )
 
     c4.metric(
         "Debt / Equity",
-        round(
-            latest["debt_to_equity"],
-            2
+        safe_metric(
+            latest["debt_to_equity"]
         )
     )
 
     c5.metric(
         "Revenue CAGR 5Y %",
-        round(
-            latest["revenue_cagr_5yr"],
-            2
+        safe_metric(
+            latest["revenue_cagr_5yr"]
         )
     )
 
     c6.metric(
         "Free Cash Flow",
-        round(
-            latest["free_cash_flow_cr"],
-            2
+        safe_metric(
+            latest["free_cash_flow_cr"]
         )
     )
 
@@ -278,3 +275,5 @@ else:
             st.markdown(
                 f"❌ {cons_text}"
             )
+
+

@@ -70,6 +70,24 @@ peer_avg = (
     .mean()
 )
 
+company_row = group_df[
+    group_df["company_id"]
+    == selected_company
+]
+
+peer_avg = (
+    group_df[metrics]
+    .mean()
+)
+
+if company_row.empty:
+
+    st.warning(
+        "Peer metrics unavailable"
+    )
+
+    st.stop()
+
 company_values = (
     company_row[metrics]
     .iloc[0]

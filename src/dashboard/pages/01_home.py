@@ -4,6 +4,7 @@ import plotly.express as px
 from src.dashboard.utils.db import (
     get_home_metrics,
     get_sector_breakdown,
+    get_sector_breakdown,
     get_top_companies,
     get_companies
 )
@@ -57,7 +58,7 @@ c5.metric(
 
 c6.metric(
     "Median P/E",
-    "N/A"
+    metrics["median_pe"]
 )
 
 st.divider()

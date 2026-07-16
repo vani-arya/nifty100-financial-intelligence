@@ -9,14 +9,22 @@ st.title("📄 Annual Reports")
 
 companies = get_companies()
 
+def company_name(ticker):
+
+    rows = companies.loc[
+        companies["id"] == ticker,
+        "company_name"
+    ]
+
+    if rows.empty:
+        return ticker
+
+    return rows.iloc[0]
+
 selected_company = st.selectbox(
     "Select Company",
     companies["id"].tolist(),
-    format_func=lambda x:
-        companies.loc[
-            companies["id"] == x,
-            "company_name"
-        ].iloc[0]
+    format_func=company_name
 )
 
 reports = get_reports(
