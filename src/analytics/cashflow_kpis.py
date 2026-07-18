@@ -91,18 +91,18 @@ def classify_capex_intensity(
 
 def calculate_fcf_conversion_rate(
     free_cash_flow: float,
-    operating_profit: float
+    cash_from_operations: float
 ) -> float | None:
     """
     Calculate FCF conversion rate.
     """
 
-    if operating_profit == 0:
+    if cash_from_operations == 0:
         return None
 
     return round(
         free_cash_flow /
-        operating_profit *
+        cash_from_operations *
         100,
         2
     )
