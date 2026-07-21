@@ -331,6 +331,10 @@ def create_cashflow_waterfall(
 
     conn.close()
 
+    if df.empty:
+
+        return None
+
     row = df.iloc[0]
 
     labels = [
@@ -399,6 +403,24 @@ def get_latest_ratios(company_id):
 
     conn.close()
 
+    if df.empty:
+
+       return pd.Series({
+
+           "return_on_equity_pct": None,
+
+           "return_on_capital_employed_pct": None,
+
+           "debt_to_equity": None,
+
+           "interest_coverage": None,
+
+           "revenue_cagr_5yr": None,
+
+           "net_profit_margin_pct": None
+
+        })
+
     return df.iloc[0]
 
 
@@ -423,6 +445,15 @@ def get_company_name(company_id):
         return row[0]
 
     return company_id
+
+
+def fmt(value, suffix=""):
+
+    if pd.isna(value):
+
+        return "NA"
+
+    return f"{value:.2f}{suffix}"
 
 
 def draw_kpi_tile(
@@ -515,13 +546,19 @@ def get_capital_allocation_label(
         df["company_id"] == company_id
     ]
 
-    if not row.empty:
+    if row.empty:
 
-        return row.iloc[0][
-            "capital_allocation_label"
-        ]
+       return "Unknown"
 
-    return "Unknown"
+    value = row.iloc[0][
+        "capital_allocation_label"
+    ]
+
+    if pd.isna(value):
+
+       return "Unknown"
+
+    return str(value)
 
 
 def generate_tearsheet(company_id):
@@ -591,7 +628,11 @@ def generate_tearsheet(company_id):
     tile_width,
     tile_height,
     "ROE %",
-    f"{ratio_row['return_on_equity_pct']:.2f}"
+    fmt(
+        ratio_row[
+            "return_on_equity_pct"
+        ]
+    )
     )
 
     draw_kpi_tile(
@@ -601,7 +642,11 @@ def generate_tearsheet(company_id):
     tile_width,
     tile_height,
     "ROCE %",
-    f"{ratio_row['return_on_capital_employed_pct']:.2f}"
+    fmt(
+        ratio_row[
+           "return_on_capital_employed_pct"
+        ]
+    )
     )
 
     draw_kpi_tile(
@@ -611,7 +656,11 @@ def generate_tearsheet(company_id):
     tile_width,
     tile_height,
     "Debt / Equity",
-    f"{ratio_row['debt_to_equity']:.2f}"
+    fmt(
+        ratio_row[
+            "debt_to_equity"
+        ]
+    )
     )
 
     #Row 2
@@ -623,7 +672,11 @@ def generate_tearsheet(company_id):
     tile_width,
     tile_height,
     "Interest Cov.",
-    f"{ratio_row['interest_coverage']:.2f}"
+    fmt(
+       ratio_row[
+           "interest_coverage"
+        ]
+    )
     )
 
     draw_kpi_tile(
@@ -633,7 +686,12 @@ def generate_tearsheet(company_id):
     tile_width,
     tile_height,
     "Revenue CAGR",
-    f"{ratio_row['revenue_cagr_5yr']:.2f}%"
+    fmt(
+      ratio_row[
+          "revenue_cagr_5yr"
+        ],
+        "%"
+    )
     )
 
     draw_kpi_tile(
@@ -643,7 +701,12 @@ def generate_tearsheet(company_id):
     tile_width,
     tile_height,
     "Net Margin",
-    f"{ratio_row['net_profit_margin_pct']:.2f}%"
+    fmt(
+        ratio_row[
+            "net_profit_margin_pct"
+        ],
+        "%"
+    )
     )
 
     #Embed Charts
@@ -790,13 +853,15 @@ def generate_tearsheet(company_id):
     "Cash Flow Waterfall"
     )
 
-    c.drawImage(
-    cashflow_chart,
-    40,
-    220,
-    width=500,
-    height=180
-    )
+    if cashflow_chart:
+
+       c.drawImage(
+           cashflow_chart,
+           40,
+           220,
+           width=500,
+           height=180
+        )
 
     pros, cons = get_pros_cons(
        company_id
