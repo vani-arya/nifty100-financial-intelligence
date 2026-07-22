@@ -267,13 +267,13 @@ cluster_map = {
 
     0: "Emerging Growth",
 
-    1: "High-Quality Growth",
+    1: "High-Quality Compounders",
 
-    2: "Defensive Dividend",
+    2: "Defensive Dividend Payers",
 
     3: "Value Cyclicals",
 
-    4: "Distressed"
+    4: "Distressed Turnaround"
 }
 
 df["cluster_name"] = (
@@ -301,7 +301,7 @@ labels.to_csv(
 )
 
 
-profiles = (
+cluster_mean = (
     df.groupby(
         "cluster_id"
     )[features]
@@ -309,8 +309,20 @@ profiles = (
     .round(2)
 )
 
-profiles.to_csv(
-    "output/cluster_profiles.csv"
+cluster_median = (
+    df.groupby(
+        "cluster_id"
+    )[features]
+    .median()
+    .round(2)
+)
+
+cluster_mean.to_csv(
+    "output/cluster_profiles_mean.csv"
+)
+
+cluster_median.to_csv(
+    "output/cluster_profiles_median.csv"
 )
 
 
